@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Internal marker-model ONNX execution shared by the Laya and Julia decision providers.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DecisionInference.Abstractions\DecisionInference.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" />
+    <PackageReference Include="System.Numerics.Tensors" />
+    <InternalsVisibleTo Include="DecisionInference.Laya" />
+    <InternalsVisibleTo Include="DecisionInference.Julia" />
+  </ItemGroup>
+</Project>

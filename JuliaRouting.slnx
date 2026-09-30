@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/vendor/">
+    <Project Path="vendor/src/DecisionInference.Abstractions/DecisionInference.Abstractions.csproj" />
+    <Project Path="vendor/src/DecisionInference.Onnx/DecisionInference.Onnx.csproj" />
+    <Project Path="vendor/src/DecisionInference.Julia/DecisionInference.Julia.csproj" />
+  </Folder>
+  <Project Path="src/OutcomeRouting/OutcomeRouting.csproj" />
+  <Project Path="src/JuliaRouting.Sample/JuliaRouting.Sample.csproj" />
+  <Project Path="tests/OutcomeRouting.Tests/OutcomeRouting.Tests.csproj" />
+</Solution>

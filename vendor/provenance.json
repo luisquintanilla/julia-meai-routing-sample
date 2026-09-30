@@ -1,0 +1,33 @@
+{
+  "repository": "https://github.com/luisquintanilla/typesafe-meai",
+  "commit": "2266e935007b83391b9ea4c506ec6703b271372b",
+  "sourceLicense": "The source owner authorized MIT distribution of this sample and the pinned vendored C# implementation in this publication. See vendor/LICENSE and THIRD_PARTY_NOTICES.md. The upstream revision had no root LICENSE; no prior upstream MIT license is asserted.",
+  "sourceAdaptations": [],
+  "buildAdaptations": [
+    "Use this sample's root net10.0/nullable/implicit-usings/deterministic/warnings-as-errors properties instead of original repository branding/build properties.",
+    "Limit central package versions to the actual dependency closure and sample/test dependencies; all copied csproj files remain byte-identical.",
+    "Add an empty local Directory.Build.targets to prevent unrelated ancestor Arcade build imports.",
+    "Native CPU Microsoft.ML.OnnxRuntime is referenced by the console executable, not added to vendored libraries.",
+    "Regenerate NuGet lock files for this dependency closure; original repository lock files are not copied.",
+    "Disable Git text conversion for vendor/src so source bytes and provenance hashes remain stable.",
+    "Vendored Julia/ONNX projects retain their System.Numerics.Tensors 10.0.9 references. Microsoft.Extensions.AI 10.10.0 requires >=10.0.12, so NuGet resolves 10.0.12 in the final routing executable. No downgrade-warning suppression or source change is used; native validation used this resolved runtime.",
+    "The sample uses Microsoft.Data.Sqlite 10.0.12, whose supported package graph selects SQLitePCLRaw bundle/core/provider/native library 2.1.12, replacing the vulnerable native library 2.1.11. Vendored decision source/projects are unchanged."
+  ],
+  "files": [
+    { "path": "src/DecisionInference.Abstractions/DecisionGeneratorExtensions.cs", "sha256": "335ffb2ecd9caa164ad0eeaef8d498652621ac9fed6d3195221c6c8c0951425e" },
+    { "path": "src/DecisionInference.Abstractions/DecisionInference.Abstractions.csproj", "sha256": "1b95ed835e43cc683e94c12705f73775af81df8da071e42c442f0f52408526d8" },
+    { "path": "src/DecisionInference.Abstractions/DecisionInput.cs", "sha256": "257b77c66d2b8477bc96df0de5f74a60101054994a3d9eecbc3a3c51694af7df" },
+    { "path": "src/DecisionInference.Abstractions/DecisionResult.cs", "sha256": "80d5b0b74753bf06f8a9bdba0fa7280a8ab72004c3f658c1be7de9905b4fefa0" },
+    { "path": "src/DecisionInference.Abstractions/DecisionResultExtensions.cs", "sha256": "1610c4826007e72289605831cceb353edc35e8d4cdeedb80a7dbafe7d4049796" },
+    { "path": "src/DecisionInference.Abstractions/IDecisionGenerator.cs", "sha256": "a6999957ad2aef961cbb01c4d46d02b10cf9561baa0e26bb5793e75f078e2d2b" },
+    { "path": "src/DecisionInference.Julia/DecisionInference.Julia.csproj", "sha256": "6c1b540f19aa88e2d4d3680b9e508f243e2f8b88923c6324adacde419c4bdbea" },
+    { "path": "src/DecisionInference.Julia/DecodeDecisions.cs", "sha256": "458d76ec2422c137ae92412b76b6d9ca35f9bcef500962e6ebd4929f26ce917f" },
+    { "path": "src/DecisionInference.Julia/JuliaDecisionGenerator.cs", "sha256": "eca6625aee5234adbd84f55312590389e0af8a076d9b3010ff04966faaeaa96d" },
+    { "path": "src/DecisionInference.Julia/JuliaDecisionGeneratorOptions.cs", "sha256": "125ff98f57e9a4f43eefe9414bd1d2878b206ce25b6d67b9c65b9ad55346b54b" },
+    { "path": "src/DecisionInference.Julia/PrepareDecisionInputs.cs", "sha256": "afe90938564cfae425209b267500da387bd262261f962768c9349b1e1d1a9b13" },
+    { "path": "src/DecisionInference.Julia/PythonJson.cs", "sha256": "e2a8ee6c85c4fdebfad61e6ad9c848c0d4428a87d170b1d9a6ef1669561d2e18" },
+    { "path": "src/DecisionInference.Julia/ScoreOnnxDecisionModel.cs", "sha256": "1bbcfa4e4cc8ca4b845b24eac7a6ede4a17cf1c20e6be0b0ecafd8a10f717652" },
+    { "path": "src/DecisionInference.Onnx/DecisionInference.Onnx.csproj", "sha256": "90f7a3f394a1ba32951d8ddaa14ad50f45d8888101bce91420e143292ec9745f" },
+    { "path": "src/DecisionInference.Onnx/MarkerOnnxRunner.cs", "sha256": "a4f8d5b2020365fbc816a006d192aa34bc1b427591ca8790dc22e692569b0819" }
+  ]
+}

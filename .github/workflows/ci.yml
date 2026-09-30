@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Locked restore and transitive vulnerability audit
+        run: dotnet restore JuliaRouting.slnx --locked-mode --source https://api.nuget.org/v3/index.json -p:NuGetAudit=true -p:NuGetAuditMode=all -p:TreatWarningsAsErrors=true
+      - name: Build
+        run: dotnet build JuliaRouting.slnx --no-restore --configuration Release
+      - name: Test
+        run: dotnet test tests\OutcomeRouting.Tests\OutcomeRouting.Tests.csproj --no-build --no-restore --configuration Release
+      - name: Verify vendored source
+        run: .\eng\Verify-Vendor.ps1

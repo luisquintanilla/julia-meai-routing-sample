@@ -1,0 +1,26 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+.env
+.env.*
+!.env.example
+artifacts/
+.routing/
+*.user
+*.suo
+
+# Local proof artifacts, diagnostics and operational data are not release content.
+/.testagent/
+/.copilot/
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+*.binlog
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
