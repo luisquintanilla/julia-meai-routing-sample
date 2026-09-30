@@ -1,7 +1,8 @@
 # The same application API, with real Julia
 
-[Program.cs](Program.cs) visibly loads Julia and maps three clients before calling
-constructing `OutcomeRoutingChatClient` and calling standard MEAI `GetResponseAsync`.
+[Program.cs](Program.cs) visibly loads Julia through `IDecisionGenerator`, maps
+three `IChatClient` routes, and supplies history, policy, verification and observation
+before constructing `OutcomeRoutingChatClient` and calling standard MEAI `GetResponseAsync`.
 Only asset/error handling
 surrounds that application code. No CLI framework, token diagnostics, history
 projection, route hashing, or outcome-store coordination appears in the entrypoint.
@@ -26,7 +27,10 @@ REAL Julia decisions. SIMULATED chat responses.
 
 The three hash checks print a confirmation before these lines. The exercised
 request selected Balanced and passed independent verification; the main code
-needs only `ChatResponse.Text`. [Optional typed routing metadata](../../docs/03-code-tour.md#optional-outcome-information)
+needs only `ChatResponse.Text`. The console observer now prints the actual decision
+probabilities/policy/route before invocation and attempt telemetry before the answer;
+the two-line capture above omits those optional telemetry lines.
+[Optional typed routing metadata](../../docs/03-code-tour.md#optional-outcome-information)
 supports diagnostics without changing that call. Julia's selected
 tier is not a benchmark or a promise for other inputs. History persists at
 `.routing\julia-quickstart.db`; a known failure can influence later requests.
@@ -44,6 +48,10 @@ Real chat adapters fit the same `IChatClient` route mapping. The existing
 shows concrete OpenAI client creation; consult [billing/privacy](../../docs/05-live-chat.md)
 before opting in. Metadata must contain the actual endpoint and model, and route
 defaults must suit those models. No real endpoint compatibility is asserted.
+The [Ollama consumer](../OllamaRouting/README.md) shows a concrete local provider
+with real answers and a clearly labeled fixture decision signal. To combine both,
+use its caller-owned Ollama clients here instead of the demonstration clients;
+no decision abstraction or invocation contract needs changing.
 
 Candidate probabilities are relative to the proposed choices, **not task-success
 chances**; no weights change. Supported complete text/role history must fit the

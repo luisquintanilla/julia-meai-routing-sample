@@ -6,5 +6,6 @@
     <ProjectReference Include="..\..\src\OutcomeRouting\OutcomeRouting.csproj" />
     <Compile Include="..\Shared\DemoChatClient.cs" Link="DemoChatClient.cs" />
     <Compile Include="..\Shared\SortVerification.cs" Link="SortVerification.cs" />
+    <Compile Include="..\Shared\ConsoleRoutingObserver.cs" Link="ConsoleRoutingObserver.cs" />
   </ItemGroup>
 </Project>

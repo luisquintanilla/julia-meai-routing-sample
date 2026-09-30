@@ -114,7 +114,7 @@ public sealed class OutcomeApplication(OutcomeRouter router, RouteCatalog catalo
                     update = iterator.Current;
                     cancellationToken.ThrowIfCancellationRequested();
                     supportedText &= (update.Role is null || update.Role == ChatRole.Assistant) &&
-                        update.Contents.All(content => content is TextContent);
+                        update.Contents.All(content => content is TextContent or UsageContent);
                     text.Append(update.Text);
 
                     if (text.Length > 16_384)

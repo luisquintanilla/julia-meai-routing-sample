@@ -8,10 +8,15 @@ Start with the code you would write:
   routed `IChatClient` creation, standard response calls, and a useful outcome.
 - [Julia application](../samples/JuliaRouting/README.md): the same calls with a real
   owning local decision generator.
+- [Ollama application](../samples/OllamaRouting/README.md): explicit local provider
+  clients and real answers, with a clearly simulated decision signal.
 
 The [API and code tour](03-code-tour.md) explains the MEAI contract and how to
 configure existing `IChatClient` adapters. Read advanced internals only when you
 want to adapt policy, verification, or persistence.
+The examples expose `IDecisionGenerator`, `ChatRoute`/`IChatClient`, `IOutcomeStore`,
+policy, request-specific verification and optional `IRoutingObserver`. Observation
+is an intermediate decision/attempt view, not another response contract.
 
 | Advanced reference | Purpose |
 |---|---|

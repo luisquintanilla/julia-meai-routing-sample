@@ -24,6 +24,7 @@ public sealed class OutcomeRouter : FailoverChatClient
     private readonly PolicySettings _settings;
     private readonly DecisionPolicy _policy;
     private readonly IOutcomeStore _store;
+    private readonly IRoutingObserver? _observer;
 
     public int PendingRequestCount => _pending.Count;
 
@@ -31,10 +32,12 @@ public sealed class OutcomeRouter : FailoverChatClient
         IDecisionGenerator generator,
         RouteCatalog catalog,
         PolicySettings settings,
-        IOutcomeStore store)
+        IOutcomeStore store,
+        IRoutingObserver? observer = null)
     {
         settings.Validate();
         (_catalog, _settings, _store) = (catalog, settings, store);
+        _observer = observer;
         _policy = new(generator, catalog, settings);
         MaximumAttemptsPerRequest = settings.MaximumAttempts;
     }
@@ -76,6 +79,13 @@ public sealed class OutcomeRouter : FailoverChatClient
 
             session.Invoked.Add(route.ExecutionIdentity);
             session.Current = route;
+
+            if (_observer is not null)
+            {
+                await _observer.ObserveAsync(RoutingObservation.Create(session, route), cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             return route.Client;
         }
         catch
@@ -85,7 +95,7 @@ public sealed class OutcomeRouter : FailoverChatClient
         }
     }
 
-    protected override ValueTask OnRoutingUpdateAsync(
+    protected override async ValueTask OnRoutingUpdateAsync(
         RoutingContext context,
         FailoverChatClientAttempt attempt,
         bool isTerminal,
@@ -120,12 +130,15 @@ public sealed class OutcomeRouter : FailoverChatClient
                 session.Completed = route;
             }
 
+            if (_observer is not null)
+            {
+                await _observer.ObserveAsync(RoutingObservation.Create(session, route, record), CancellationToken.None);
+            }
+
             if (isTerminal)
             {
                 _pending.TryRemove(context, out _);
             }
-
-            return ValueTask.CompletedTask;
         }
         catch
         {

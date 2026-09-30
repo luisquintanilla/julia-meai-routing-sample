@@ -1,6 +1,7 @@
 # Julia + MEAI: outcome-aware routing
 
-Create an `IChatClient` with routing configured, then use normal MEAI calls.
+Compose a decision generator, chat routes, history, policy, verification and
+optional observation, then use normal MEAI `IChatClient` calls.
 A known independent outcome can inform the **next request**.
 
 ## The code you write
@@ -11,25 +12,37 @@ is the explicitly supplied, hash-checked local Julia directory. The chat clients
 below are **deterministic demonstrations**, not real services or quality benchmarks.
 
 ```csharp
-using var decisions = JuliaDecisionGenerator.LoadFromDirectory(assetDirectory);
-using var fast = new DemoChatClient("demo-fast", "[1,2,3]");
-using var balanced = new DemoChatClient("demo-balanced", "[1,2,3]");
-using var strong = new DemoChatClient("demo-strong", "[1,2,3]");
+using IDecisionGenerator decisions = JuliaDecisionGenerator.LoadFromDirectory(assetDirectory);
+using IChatClient fast = new DemoChatClient("demo-fast", "[1,2,3]");
+using IChatClient balanced = new DemoChatClient("demo-balanced", "[1,2,3]");
+using IChatClient strong = new DemoChatClient("demo-strong", "[1,2,3]");
 
-using IChatClient chatClient = new OutcomeRoutingChatClient(
-    decisions,
-    [
-        ChatRoute.Create(Tier.Fast, fast),
-        ChatRoute.Create(Tier.Balanced, balanced),
-        ChatRoute.Create(Tier.Strong, strong)
-    ],
-    new OutcomeRoutingOptions
+ChatRoute[] routes =
+[
+    ChatRoute.Create(Tier.Fast, fast),
+    ChatRoute.Create(Tier.Balanced, balanced),
+    ChatRoute.Create(Tier.Strong, strong)
+];
+
+IOutcomeStore history = new SqliteOutcomeStore(@".routing\julia-quickstart.db");
+IRoutingObserver observer = new ConsoleRoutingObserver(Console.Out);
+
+var routingOptions = new OutcomeRoutingOptions
+{
+    History = history,
+    Cohort = "sort-integers-v1",
+    Policy = new PolicySettings
     {
-        HistoryPath = @".routing\julia-quickstart.db",
-        Cohort = "sort-integers-v1",
-        VerifierFactory = SortVerification.ForMessages
-    })
+        ConfidenceFloor = 0.65,
+        ConservativeTier = Tier.Balanced
+    },
+    VerifierFactory = SortVerification.ForMessages,
+    Observer = observer
+};
+
+using IChatClient chatClient = new OutcomeRoutingChatClient(decisions, routes, routingOptions)
     .AsBuilder()
+    .ConfigureOptions(options => options.TopP = 0.9f)
     .Build();
 
 ChatResponse response = await chatClient.GetResponseAsync(
@@ -43,12 +56,17 @@ Use ordinary `ChatOptions`, cancellation tokens, message history, and
 The independent [sort check](samples/Shared/SortVerification.cs) applies only to
 this exact input; other requests remain Unknown rather than receiving a false grade.
 
-**`OutcomeRoutingChatClient` and its routing configuration belong to this sample**,
+`IDecisionGenerator` is the vendored decision abstraction; `IChatClient`,
+`ChatResponse` and the builder are MEAI. **`OutcomeRoutingChatClient`, `ChatRoute`,
+`IOutcomeStore`, `IRoutingObserver` and routing configuration belong to this sample's library**,
 not to Microsoft.Extensions.AI. It uses MEAI's real `FailoverChatClient`, a bounded policy,
-and transactional SQLite evidence. You do not construct a catalog, store, router,
-request session, or application coordinator to make a chat call.
+and transactional SQLite evidence. The components are explicit above; a catalog,
+request session and execution coordinator are still library responsibilities.
+`DemoChatClient`, `SortVerification`, and `ConsoleRoutingObserver` are small shared
+**sample components**, not released provider or MEAI APIs.
 
-The caller owns `decisions` and the route clients. The routed client borrows them;
+The caller owns `decisions`, route clients, and explicitly supplied history/observer.
+The routed client borrows them;
 the `using` order disposes it first. Routes read the
 endpoint and model from `IChatClient` metadata instead of repeating them. A client
 without that metadata needs the [explicit route configuration](docs/03-code-tour.md#configure-a-client-without-metadata);
@@ -72,9 +90,19 @@ Julia with a clearly labeled fixture so you need **no weights or credentials**:
 
 ```text
 SIMULATED decisions and chat responses. Real routing, verification and persistence.
+[run-1] decision: recommended=fast probabilities=[fast:0.9, balanced:0.08, strong:0.02] policy=fast route=fast
+[run-1] attempt 1: actual=fast completed=True committed=False
 [3,1,2]
+[run-2] decision: recommended=fast probabilities=[fast:0.9, balanced:0.08, strong:0.02] policy=balanced route=balanced
+[run-2] attempt 1: actual=balanced completed=True committed=False
 [1,2,3]
 ```
+
+`run-1` / `run-2` abbreviate the actual generated run IDs. The structured observer
+is notified **before** provider invocation, then after each durable attempt. Thus
+the intermediate decision is visible separately from the answer. Omit `Observer`
+for a silent client, or use the shared [in-memory collector](samples/Shared/RecordingRoutingObserver.cs).
+Observation alone never supplies quality evidence.
 
 The first client's wrong answer is checked against the independently sorted input.
 Its known failure raises the next request's minimum tier. It is **not retried for
@@ -91,6 +119,7 @@ uses the internet.
 |---|---|---|
 | Developer quickstart | MEAI routing, verification, persistence; decisions and chat are fixtures | [Getting started](samples/GettingStarted/README.md) |
 | The same API with Julia | Local CPU Julia decisions; chat is still simulated | [Julia routing](samples/JuliaRouting/README.md) |
+| Real local Ollama answers | OllamaSharp-backed chat; decision signal is explicitly simulated | [Ollama routing](samples/OllamaRouting/README.md) |
 | Advanced outcome scenario | Full failure/reload/unknown/failover demonstration; optional Julia and live chat | [Advanced walkthrough](docs/02-offline-walkthrough.md) |
 
 After [preparing the pinned assets](docs/04-native-julia.md), run the small native
@@ -111,15 +140,28 @@ Its opt-in `--julia <directory> --live` mode uses explicitly configured real cha
 clients. Review [live setup, billing, and privacy](docs/05-live-chat.md) before
 using it. No live endpoint has been certified by these local demonstrations.
 
+For real answers without acquiring Julia weights, the opt-in Ollama application
+creates `IChatClient` instances with `new OllamaApiClient(endpoint, model)`.
+It requires an already-running local Ollama daemon and explicit installed model tags;
+it never downloads a model. The [Ollama guide](samples/OllamaRouting/README.md)
+includes concrete setup and an ordinary streaming option.
+
 ## What you choose; what the library handles
 
 You choose the client-to-tier mapping. `OutcomeRoutingOptions` groups the history
 path, nonidentifying cohort for comparable tasks, optional request-specific verifier
 factory, capability/minimum tier, and bounded `PolicySettings` **at creation**.
-Default configuration uses `.routing\history.db`, cohort `text-v1`, and no verifier.
+Supply an `IOutcomeStore` through `History`, or use `HistoryPath` to let the library
+create SQLite history; supplying both is an error. With neither, it uses
+`.routing\history.db`. Default configuration uses cohort `text-v1`, no verifier,
+and no observer.
 No verifier means **Unknown**, not Success. Later independently known application
 feedback is [optionally accessible](docs/03-code-tour.md#optional-outcome-information)
 through typed response metadata and `GetService`, not required to call the client.
+The optional `IRoutingObserver` exposes bounded immutable decision/route/attempt
+telemetry without raw prompts or output. Its awaited callbacks must be concurrency-safe;
+errors propagate, and attempt notifications use an uncancelled cleanup token.
+See the [observation contract](docs/03-code-tour.md#optional-structured-observation).
 
 The library validates the decision distribution, applies policy, executes using
 MEAI, records actual attempts, and correlates verified feedback to the completed
@@ -172,6 +214,8 @@ The [CI workflow](.github/workflows/ci.yml) restores locks, audits all transitiv
 packages against official NuGet vulnerability data with warnings as errors,
 builds, runs the bounded tests and offline quickstart, and verifies the **15
 unchanged vendor C#/project hashes**. It uses no provider credentials or model assets.
+Ollama adapter tests use an in-process HTTP handler; CI checks the Ollama entrypoint
+with `--help`, never a live daemon. These are local protocol checks, not model validation.
 
 ## Attribution and release rights
 

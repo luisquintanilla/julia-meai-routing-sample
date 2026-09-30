@@ -17,6 +17,8 @@ There is no silent fallback to fixtures, default success, or empty history.
 | `--store`, `--no-verifier`, or policy flags fail in default mode | Those flags require `--julia`; the offline demo intentionally has isolated data and fixed asserted settings |
 | Experimental MEAI diagnostic | MEAI001 is expected for routing types. Suppression is local to `OutcomeRouter.cs`; do not disable all warnings solution-wide |
 | A normal chat call exceeds 300 characters | The routed client's selection projection includes every supplied message's text and role labels. This sample explicitly rejects overflow before invocation; it is not an MEAI limit and does not drop earlier history |
+| History configuration is ambiguous | Supply `IOutcomeStore` through `History` or set `HistoryPath`, never both |
+| Observer failure/cancellation | Observer callbacks are awaited; failures propagate without retry. Selection uses the request token; attempt cleanup uses `CancellationToken.None`. Keep implementations thread-safe and responsive |
 
 The local empty `Directory.Build.targets` prevents unrelated ancestor build
 targets from being imported. Do not copy another repository's build infrastructure
@@ -64,6 +66,26 @@ environment keys and optional reasoning keys are in the
 Provider/auth/timeout failures are transport failures, not semantic sorting
 failures. The app does not claim a failed provider attempt as known task evidence.
 After streaming output has reached the caller, failure is terminal.
+
+## Local Ollama errors
+
+The [Ollama example](../samples/OllamaRouting/README.md) requires an explicit
+loopback base endpoint and three exact installed model tags. It never starts
+Ollama or downloads a model.
+
+| Symptom | Check / action |
+|---|---|
+| Connection refused or endpoint unavailable | Start the local Ollama daemon yourself; confirm its loopback address/port. The app fails with exit code 2, not a fixture answer |
+| "Local Ollama models unavailable" | Run `ollama list`; explicitly acquire/select models yourself, then copy exact `model:tag` names. There is no automatic pull or tag guessing |
+| Endpoint/model argument rejected | Use a loopback HTTP(S) base URL with no path/credentials/query/fragment and local exact tags; known cloud tags are out of scope |
+| Only one physical model is configured | Reusing one tag for all tiers tests connectivity, not routing quality. Physical aliases are not retried under different tier labels |
+| Deadline or model setting error | The sample has a cooperative two-minute deadline and temperature/output/TopP settings. Use installed models that support them; no provider compatibility is promised |
+| Thinking or tool stream is not independently graded | This sample verifies completed assistant text, allowing usage telemetry but not reasoning/tool content. Unsupported output remains Unknown |
+
+Loopback is a configuration restriction, not certification of a local daemon's
+behavior. Avoid cloud/proxy aliases and private input while learning. A model can
+be removed or changed after preflight; subsequent errors still surface and mutable
+tags need configuration isolation for persistent application history.
 
 ## Storage and feedback errors
 

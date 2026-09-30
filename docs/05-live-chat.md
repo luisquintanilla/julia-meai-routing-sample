@@ -7,9 +7,18 @@ This is an optional, potentially billable step. Complete the fixture demo and
 native setup first. Adding `--live` changes downstream execution to real configured
 chat clients; **Julia remains the local decision model**.
 
+For real answers from an existing **local Ollama** installation, use
+[the Ollama consumer](../samples/OllamaRouting/README.md) instead. It needs no Julia
+assets and explicitly uses a fixture decision signal, with real Ollama chat.
+Its opt-in endpoint/model arguments, inventory preflight, standard response and
+streaming calls, and observation are shown in
+[Program.cs](../samples/OllamaRouting/Program.cs). No Ollama/cloud endpoint was
+called during implementation.
+
 The sample does not provision a service, find credentials, download models, or
 make a cloud call just because environment variables exist. `--live` is the only
-network-inference path. No live endpoint was called during sample validation.
+network-inference path in the advanced CLI; the separate Ollama consumer requires
+explicit endpoint/model arguments. No live endpoint was called during sample validation.
 
 ## Configure explicitly, without committing secrets
 
@@ -88,6 +97,21 @@ above, not hidden prerequisites or secrets embedded in source. This adapter can
 be mapped in `OutcomeRoutingChatClient` just like the demonstrations; normal
 `GetResponseAsync` / `GetStreamingResponseAsync` are the resulting invocation APIs.
 That configuration is opt-in; these excerpts do not execute a live call.
+
+The Ollama equivalent uses the provider's own direct MEAI implementation:
+
+```csharp
+using IChatClient fast = new OllamaApiClient(settings.Endpoint, settings.FastModel);
+using IChatClient balanced = new OllamaApiClient(settings.Endpoint, settings.BalancedModel);
+using IChatClient strong = new OllamaApiClient(settings.Endpoint, settings.StrongModel);
+```
+
+These exact lines are in the Ollama application, with explicitly parsed local
+settings and OllamaSharp 5.4.30. No `AsChatClient` adapter method is assumed.
+Its endpoint/model metadata participates in `ChatRoute.Create`; do not mutate
+provider configuration after creating routes. The
+[optional observer](03-code-tour.md#optional-structured-observation) exposes
+decisions/attempts but is never a verifier or part of model response content.
 
 [`ChatRoute`](../src/OutcomeRouting/Contracts.cs) uses real MEAI `ConfigureOptions`
 to set model ID, temperature **0**, maximum output tokens **128**, and optional

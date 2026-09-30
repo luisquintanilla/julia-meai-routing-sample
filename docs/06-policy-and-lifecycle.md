@@ -101,7 +101,10 @@ or sensitive metadata.
 
 The application-facing [IChatClient](../src/OutcomeRouting/OutcomeRoutingChatClient.cs)
 constructs the core wiring described here. It borrows caller-supplied generators
-and clients, including shared clients, and never disposes them. Dispose the routed client
+and clients, including shared clients, and never disposes them. It also borrows
+optional `IOutcomeStore` history and `IRoutingObserver` implementations. `History`
+and `HistoryPath` are mutually exclusive; omitted history defaults to local SQLite.
+Dispose the routed client
 first, after stopping operations, then dispose dependencies at their owning scope.
 
 [`Feedback`](../src/OutcomeRouting/Contracts.cs) has a task outcome, provenance,
@@ -201,6 +204,9 @@ failover; same-request quality cascading/hedging/ensembles are out of scope.
 `OutcomeApplication.StreamAsync` accumulates only fully completed supported text
 streams for verification, with a **16,384-character** accumulation bound.
 Unsupported content or non-assistant/non-null roles make quality Unknown.
+`UsageContent` is supported transport telemetry: it is forwarded unchanged but
+not added to the verifier's accumulated text. This allows ordinary Ollama/MEAI
+usage-bearing text streams without treating token counts as task content.
 Empty completed streams are explicit Unknown. Partial disposed output never
 becomes Success. Use `await foreach` or `await using` so enumerators are disposed;
 leaking an active enumerator prevents terminal callbacks and cleanup.
@@ -210,6 +216,23 @@ The sample rejects provider conversation IDs, continuation tokens,
 `AllowMultipleToolCalls` setting, and response-format options without a declared
 Json task capability. Empty tools and explicit background `false` remain allowed.
 It is an independent stateless text/JSON pipeline, not an agent loop.
+
+## Observing execution is not feedback
+
+`IRoutingObserver` receives a selection notification before each invocation and
+an actual-attempt notification after durable recording. The recommendation and
+policy tier stay distinct even when failover selects a higher alternate.
+Observations are immutable, contain no task/output fields, and do not change
+provider responses or streaming updates. No observer is configured by default.
+
+Calls are awaited and may overlap across requests. Observer failures propagate
+and terminate without a provider alternate; failed/cancelled requests remain
+ineligible quality evidence. Selection uses the request token; attempt callbacks
+use an uncancelled token to preserve cancellation/abandonment cleanup. An attempt
+callback failure may occur after output delivery. The
+[full observation contract](03-code-tour.md#optional-structured-observation)
+explains ordering, lifetime, errors and retention. Do not use observation to
+mark transport success as verified task success.
 
 ## Native ownership and experimental APIs
 

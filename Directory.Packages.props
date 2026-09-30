@@ -6,6 +6,7 @@
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.0" />
+    <PackageVersion Include="OllamaSharp" Version="5.4.30" />
     <PackageVersion Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.23.2" />
     <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
     <PackageVersion Include="Tokenizers.HuggingFace" Version="3.23.1" />

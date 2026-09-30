@@ -31,8 +31,8 @@ public sealed class OutcomeRoutingChatClient : IChatClient
         _configuration = options ?? new OutcomeRoutingOptions();
         _configuration.Validate();
 
-        _store = new SqliteOutcomeStore(_configuration.HistoryPath);
-        _router = new OutcomeRouter(decisions, catalog, _configuration.Policy, _store);
+        _store = _configuration.History ?? new SqliteOutcomeStore(_configuration.HistoryPath ?? @".routing\history.db");
+        _router = new OutcomeRouter(decisions, catalog, _configuration.Policy, _store, _configuration.Observer);
         _application = new OutcomeApplication(_router, catalog, _store);
     }
 
@@ -206,11 +206,15 @@ public sealed class OutcomeRoutingChatClient : IChatClient
 
 public sealed record OutcomeRoutingOptions
 {
-    public string HistoryPath { get; init; } = @".routing\history.db";
+    public string? HistoryPath { get; init; }
+
+    /// <summary>Optional caller-owned history abstraction. Cannot be combined with HistoryPath.</summary>
+    public IOutcomeStore? History { get; init; }
     public string Cohort { get; init; } = "text-v1";
     public Capability RequiredCapabilities { get; init; } = Capability.Text;
     public Tier MinimumTier { get; init; } = Tier.Fast;
     public PolicySettings Policy { get; init; } = new();
+    public IRoutingObserver? Observer { get; init; }
 
     /// <summary>
     /// Creates an independent check for these exact messages. Null means unknown quality.
@@ -220,7 +224,15 @@ public sealed record OutcomeRoutingOptions
 
     internal void Validate()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(HistoryPath);
+        if (History is not null && HistoryPath is not null)
+        {
+            throw new ArgumentException("Choose History or HistoryPath, not both.");
+        }
+
+        if (HistoryPath is not null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(HistoryPath);
+        }
         Guard.Key(Cohort, nameof(Cohort));
         Guard.Capabilities(RequiredCapabilities);
 

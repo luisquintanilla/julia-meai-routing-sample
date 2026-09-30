@@ -10,5 +10,6 @@
   <Folder Name="/samples/">
     <Project Path="samples/GettingStarted/GettingStarted.csproj" />
     <Project Path="samples/JuliaRouting/JuliaRouting.csproj" />
+    <Project Path="samples/OllamaRouting/OllamaRouting.csproj" />
   </Folder>
 </Solution>

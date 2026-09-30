@@ -28,3 +28,5 @@ jobs:
         run: .\eng\Verify-Vendor.ps1
       - name: Run developer quickstart (offline)
         run: dotnet run --project samples\GettingStarted --no-build --no-restore --configuration Release
+      - name: Check Ollama entrypoint (no endpoint call)
+        run: dotnet run --project samples\OllamaRouting --no-build --no-restore --configuration Release -- --help

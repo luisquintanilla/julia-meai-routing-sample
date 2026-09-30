@@ -7,6 +7,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\OutcomeRouting\OutcomeRouting.csproj" />
     <Compile Include="..\..\samples\Shared\SortVerification.cs" Link="SortVerification.cs" />
+    <Compile Include="..\..\samples\Shared\ConsoleRoutingObserver.cs" Link="ConsoleRoutingObserver.cs" />
+    <Compile Include="..\..\samples\Shared\RecordingRoutingObserver.cs" Link="RecordingRoutingObserver.cs" />
+    <Compile Include="..\..\samples\OllamaRouting\OllamaSettings.cs" Link="OllamaSettings.cs" />
+    <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />

@@ -43,6 +43,7 @@ Reviewed package metadata and bundled licenses include:
 | Microsoft.Data.Sqlite | 10.0.12 | MIT |
 | SQLitePCLRaw bundle/core/provider/native library | 2.1.12 | Apache-2.0 package metadata; retain native SQLite distribution notices |
 | OpenAI .NET SDK | 2.13.0 (transitive) | MIT |
+| OllamaSharp | 5.4.30 | MIT; package-carried `LICENSE` |
 | xUnit v3 / Visual Studio runner | 3.2.2 / 3.1.5 | Apache-2.0 |
 | Microsoft.NET.Test.Sdk | 17.14.1 | MIT |
 
@@ -51,6 +52,13 @@ notices remain authoritative for their components. Before redistributing compile
 binaries, retain all required dependency/native notices and review the complete
 resolved graph; this source-level summary is not a binary redistribution bundle
 or legal certification.
+
+The Ollama consumer uses the published OllamaSharp package, not copied provider
+source. Its `OllamaApiClient` implements `IChatClient` directly; the 5.4.30 contract
+and MIT notice were reviewed at
+[source revision b1b408df](https://github.com/awaescher/OllamaSharp/tree/b1b408df43a2a13a29e8db9de3130fa6f44aacc9).
+Ollama models are not bundled and retain their own licenses. Review a chosen
+model's rights before explicitly downloading it yourself.
 
 Microsoft.Data.Sqlite 10.0.12 selects SQLitePCLRaw 2.1.12, including the native
 `SQLitePCLRaw.lib.e_sqlite3` asset. This replaces vulnerable 2.1.11; see

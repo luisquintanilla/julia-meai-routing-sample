@@ -10,11 +10,21 @@ decision generator and chat clients, map three tiers, create an `IChatClient`, a
 call standard MEAI `GetResponseAsync`. `OutcomeRoutingChatClient` is a
 **sample-owned IChatClient implementation**, not a released MEAI type.
 
-Its constructor accepts caller-owned `IDecisionGenerator` and routes, with optional
+Its constructor accepts caller-owned `IDecisionGenerator` and `ChatRoute` mappings
+of physical `IChatClient` instances, with optional
 `OutcomeRoutingOptions`. Those group history path, comparable-task cohort, policy,
-capabilities/minimum tier and an independent request-specific verifier factory.
+capabilities/minimum tier, an independent request-specific verifier factory and
+`IRoutingObserver`. The examples now declare those components visibly rather than
+presenting a convenience facade as the only way to compose them.
 The defaults keep quality Unknown; response completion is never success evidence.
 The SQLite store uses short-lived connections, not a connection you manage.
+
+`History` accepts the existing `IOutcomeStore` abstraction, such as
+`SqliteOutcomeStore`; the library borrows that instance. Alternatively, `HistoryPath`
+creates SQLite history internally. Setting both is rejected, not silently ignored.
+With neither, the existing `.routing\history.db` default applies. The history
+abstraction has no disposal requirement; each SQLite operation owns its short-lived
+connection. Custom implementations own their resources and must support concurrency.
 
 Dispose the routed client **before** its borrowed generator and route clients.
 Shared clients are disposed only once at their owning scope; this implementation
@@ -43,6 +53,54 @@ provider continuation/conversation options, background responses and tool contro
 fail explicitly. A requested response format requires declared Json capability.
 Caller options are cloned, and the internal routing session key never reaches
 the provider. Route-specific options still override model/temperature/output budget.
+
+## Optional structured observation
+
+[`IRoutingObserver`](../src/OutcomeRouting/RoutingObservation.cs) is a shared
+library contract, not an MEAI middleware or an application execution API. Its
+`ObserveAsync(RoutingObservation, CancellationToken)` method receives immutable
+run-correlated metadata:
+
+| Phase | When | What the route means |
+|---|---|---|
+| `RouteSelected` | After decision persistence and policy selection, before provider invocation | The route about to be invoked; not a completed answer |
+| `AttemptFinished` | After the actual attempt is persisted, before verification/reselection | The actual invoked route and its completion/commit/error telemetry |
+
+Both phases include decision model, recommendation, copied read-only candidate
+probabilities/reasons, policy tier, route name/identity/tier and the same local
+`RunId`. Attempt notifications also include the immutable `AttemptRecord`.
+They omit raw messages, projected state, response and feedback. Model/route metadata
+can still identify infrastructure: choose safe names and control logs yourself.
+Telemetry is not task-quality evidence. Use independent verification or application
+feedback for that.
+
+The default is **no observer and no output**. Shared sample
+[`ConsoleRoutingObserver`](../samples/Shared/ConsoleRoutingObserver.cs) formats
+one atomic correlated line; [`RecordingRoutingObserver`](../samples/Shared/RecordingRoutingObserver.cs)
+uses a concurrent queue and returns read-only in-memory snapshots. They are
+sample components, not extra library front doors. The collector is deliberately
+not persisted or globally registered; its owning application controls lifetime
+and retention. A production observer should apply an appropriate retention bound.
+
+Callbacks are awaited, ordered within each request, and may overlap across
+concurrent requests. Implementations must be thread-safe and promptly complete;
+there is no fire-and-forget task, `AsyncLocal`, observer timeout or error-swallowing
+queue. Selection notifications use the request cancellation token and cancellation
+is checked again before invocation. Attempt notifications use `CancellationToken.None`
+so cancellation/abandonment cannot suppress already-persisted cleanup telemetry.
+
+Observer exceptions propagate. MEAI selection/hook failures terminate the request,
+**not** fail over to another model. The coordinator records Failed, or Cancelled
+when the request token is cancelled, with no fabricated feedback. An attempt
+observer can therefore fail after provider output has completed or been delivered;
+its persisted attempt remains, but no successful task result is invented.
+Invalid input, failed decision/persistence, or cancellation before selection can
+produce no notification. There is no promised terminal observer event: durable
+run status and independent outcomes remain history responsibilities.
+
+Observers are borrowed and not disposed by the routing client. In the standard
+response path they run before `ChatResponse` is returned; in streaming they are a
+separate side effect and never become synthetic `ChatResponseUpdate` objects.
 
 ## Standard MEAI composition and streaming
 
@@ -154,6 +212,7 @@ These files are **advanced implementation**, not things you must wire to use it:
 | File | Responsibility |
 |---|---|
 | [OutcomeRoutingChatClient.cs](../src/OutcomeRouting/OutcomeRoutingChatClient.cs) | Standard MEAI contract, request projection and borrowed lifetime |
+| [RoutingObservation.cs](../src/OutcomeRouting/RoutingObservation.cs) | Optional immutable decision/route/attempt observations and async observer contract |
 | [Contracts.cs](../src/OutcomeRouting/Contracts.cs) | Typed tasks, outcomes, metadata-derived/explicit routes and configuration identity |
 | [DecisionPolicy.cs](../src/OutcomeRouting/DecisionPolicy.cs) | Compact state, typed alternatives, deterministic bounded policy |
 | [OutcomeRouter.cs](../src/OutcomeRouting/OutcomeRouter.cs) | Actual MEAI selection and attempt hooks |
@@ -230,6 +289,14 @@ The existing [routing acceptance](../tests/OutcomeRouting.Tests/RoutingAcceptanc
 [policy/verifier](../tests/OutcomeRouting.Tests/PolicyAndVerifierTests.cs) suites
 retain the detailed cancellation, failover, concurrency, corruption and
 configuration-isolation guarantees.
+
+[RoutingObservationTests.cs](../tests/OutcomeRouting.Tests/RoutingObservationTests.cs)
+checks observation ordering, correlation, concurrent runs, errors/cancellation,
+history injection, unchanged responses/updates and no inferred quality.
+[OllamaRoutingTests.cs](../tests/OutcomeRouting.Tests/OllamaRoutingTests.cs)
+checks the actual pinned adapter using offline HTTP payloads, not a live server.
+The [Ollama consumer](../samples/OllamaRouting/README.md) demonstrates provider
+creation against that same `IChatClient` abstraction.
 
 The [lifecycle reference](06-policy-and-lifecycle.md) describes the supported
 stateless options and limits. The [native guide](04-native-julia.md) explains the
