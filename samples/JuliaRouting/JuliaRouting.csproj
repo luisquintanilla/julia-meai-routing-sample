@@ -4,10 +4,11 @@
     <PublishAot>false</PublishAot>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OutcomeRouting\OutcomeRouting.csproj" />
+    <ProjectReference Include="..\..\src\OutcomeRouting\OutcomeRouting.csproj" />
     <ProjectReference Include="..\..\vendor\src\DecisionInference.Julia\DecisionInference.Julia.csproj" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-    <Compile Include="..\..\samples\Shared\NativeAssets.cs" Link="NativeAssets.cs" />
+    <Compile Include="..\Shared\DemoChatClient.cs" Link="DemoChatClient.cs" />
+    <Compile Include="..\Shared\SortVerification.cs" Link="SortVerification.cs" />
+    <Compile Include="..\Shared\NativeAssets.cs" Link="NativeAssets.cs" />
   </ItemGroup>
 </Project>

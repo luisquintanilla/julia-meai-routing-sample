@@ -60,15 +60,44 @@ Missing live settings fail **before native loading and client creation**.
 
 ## What gets invoked?
 
-[`LiveConfiguration.CreateClients`](../src/JuliaRouting.Sample/Program.cs) creates
+[`LiveConfiguration.CreateClients`](../src/JuliaRouting.Sample/LiveConfiguration.cs) creates
 the actual OpenAI SDK client and adapts each model using `AsIChatClient`.
 SDK retries are disabled; MEAI's attempt ledger reflects configured route
 invocations rather than hiding SDK-level retries.
+
+The concrete standard adapter setup in that file is:
+
+```csharp
+var openai = new OpenAIClient(
+    new ApiKeyCredential(ApiKey),
+    new OpenAIClientOptions
+    {
+        Endpoint = Endpoint,
+        RetryPolicy = new System.ClientModel.Primitives.ClientRetryPolicy(maxRetries: 0)
+    });
+```
+
+Each declared tier then creates a normal model-specific MEAI client:
+
+```csharp
+IChatClient chatClient = openai.GetChatClient(Models[index]).AsIChatClient();
+```
+
+`ApiKey`, `Endpoint` and `Models` are the explicitly validated environment settings
+above, not hidden prerequisites or secrets embedded in source. This adapter can
+be mapped in `OutcomeRoutingChatClient` just like the demonstrations; normal
+`GetResponseAsync` / `GetStreamingResponseAsync` are the resulting invocation APIs.
+That configuration is opt-in; these excerpts do not execute a live call.
 
 [`ChatRoute`](../src/OutcomeRouting/Contracts.cs) uses real MEAI `ConfigureOptions`
 to set model ID, temperature **0**, maximum output tokens **128**, and optional
 reasoning effort. It removes application request metadata before forwarding.
 Caller options are cloned, not mutated.
+
+The small [Julia application's](../samples/JuliaRouting/Program.cs)
+`ChatRoute.Create` maps a configured `IChatClient` from its actual metadata.
+The advanced live console uses explicit route identities for this SDK configuration;
+neither API guesses absent model/endpoint metadata. Both use the same route defaults.
 
 Those defaults are suitable only for models/endpoints that accept them. Some
 reasoning models reject explicit temperature or use a different reasoning
@@ -116,9 +145,14 @@ when packaging your own changes. Do not upload local transcripts blindly.
 
 ## Known limitations
 
-Only short independent stateless text/JSON tasks are supported. Provider
+Only short stateless text/JSON requests are supported. The routed `IChatClient`
+supports complete supplied system/user/assistant text history, with its full
+role/text selection projection limited to 300 characters. It forwards every
+original message, not only the last turn. This sample limit is not an MEAI limit.
+Provider
 conversation IDs, continuation tokens, background execution and tool controls
-are rejected. There is no multi-turn agent or function-calling harness.
+are rejected. Complete supplied text history is not a provider conversation/session.
+There is no agent or function-calling harness.
 Capabilities in the catalog are declarations that the application must validate.
 
 The exact-sort verifier remains a toy check, even with a real chat model.

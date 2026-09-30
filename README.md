@@ -1,169 +1,189 @@
-# Julia + MEAI: learn outcome-aware model routing
+# Julia + MEAI: outcome-aware routing
 
-**Choose a model route, check what it actually did, and use that outcome on the
-next request.** This small .NET 10 console sample makes each step visible. Start
-without model weights, credentials, a GPU, Python, or any model-service calls.
+Create an `IChatClient` with routing configured, then use normal MEAI calls.
+A known independent outcome can inform the **next request**.
 
-The default demonstration **simulates both decision signals and downstream chat
-responses**. Its routing/failover APIs, application policy, independent checks,
-and SQLite persistence are real. Native Julia and live chat are separate opt-ins.
+## The code you write
 
-> No official Microsoft, Julia, or Jevia endorsement is implied.
+This is the application-facing part of
+[`samples/JuliaRouting/Program.cs`](samples/JuliaRouting/Program.cs). `assetDirectory`
+is the explicitly supplied, hash-checked local Julia directory. The chat clients
+below are **deterministic demonstrations**, not real services or quality benchmarks.
+
+```csharp
+using var decisions = JuliaDecisionGenerator.LoadFromDirectory(assetDirectory);
+using var fast = new DemoChatClient("demo-fast", "[1,2,3]");
+using var balanced = new DemoChatClient("demo-balanced", "[1,2,3]");
+using var strong = new DemoChatClient("demo-strong", "[1,2,3]");
+
+using IChatClient chatClient = new OutcomeRoutingChatClient(
+    decisions,
+    [
+        ChatRoute.Create(Tier.Fast, fast),
+        ChatRoute.Create(Tier.Balanced, balanced),
+        ChatRoute.Create(Tier.Strong, strong)
+    ],
+    new OutcomeRoutingOptions
+    {
+        HistoryPath = @".routing\julia-quickstart.db",
+        Cohort = "sort-integers-v1",
+        VerifierFactory = SortVerification.ForMessages
+    })
+    .AsBuilder()
+    .Build();
+
+ChatResponse response = await chatClient.GetResponseAsync(
+    "Sort [3,1,2] ascending. Return only the JSON array.");
+Console.WriteLine(response.Text);
+```
+
+The return value is the **actual provider `ChatResponse`**, not a custom result.
+Use ordinary `ChatOptions`, cancellation tokens, message history, and
+`GetStreamingResponseAsync`. Normal `.AsBuilder()` middleware still composes.
+The independent [sort check](samples/Shared/SortVerification.cs) applies only to
+this exact input; other requests remain Unknown rather than receiving a false grade.
+
+**`OutcomeRoutingChatClient` and its routing configuration belong to this sample**,
+not to Microsoft.Extensions.AI. It uses MEAI's real `FailoverChatClient`, a bounded policy,
+and transactional SQLite evidence. You do not construct a catalog, store, router,
+request session, or application coordinator to make a chat call.
+
+The caller owns `decisions` and the route clients. The routed client borrows them;
+the `using` order disposes it first. Routes read the
+endpoint and model from `IChatClient` metadata instead of repeating them. A client
+without that metadata needs the [explicit route configuration](docs/03-code-tour.md#configure-a-client-without-metadata);
+an unknown identity is an error, not a guessed default.
 
 ## Try it first
 
 Install a [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and
-[Git](https://git-scm.com/downloads). The commands below use PowerShell and
-Windows paths; Windows x64 is the native configuration exercised here.
-No machine-learning background is required.
-
-If you already have the source, open a terminal at its root. Once the repository
-is published:
+[Git](https://git-scm.com/downloads). From PowerShell:
 
 ```powershell
 git clone https://github.com/luisquintanilla/julia-meai-routing-sample.git
 Set-Location julia-meai-routing-sample
 dotnet restore JuliaRouting.slnx --locked-mode
-dotnet run --project src\JuliaRouting.Sample --no-restore
+dotnet run --project samples\GettingStarted --no-restore
 ```
 
-Restore may download **NuGet packages**, including native runtime libraries.
-The application does not download models. "Offline demo" means no network model
-inference, not that first-time dependency acquisition never needs the internet.
-It creates a fresh ignored `.routing\demo-<unique>\history.db` each time.
-
-### What should you see?
-
-The task is deliberately tiny: sort `[3,1,2]` and return only the JSON array.
-Here are five lines from the actual run; the
-[annotated walkthrough](docs/02-offline-walkthrough.md#captured-output) includes
-the complete transition output and explains every column.
+Open the complete [`GettingStarted/Program.cs`](samples/GettingStarted/Program.cs).
+It has the same client mapping, construction, and MEAI calls as above. It replaces
+Julia with a clearly labeled fixture so you need **no weights or credentials**:
 
 ```text
-1 initial: signal=fast distribution=[fast:0.9, balanced:0.08, strong:0.02] policy=fast actual=fast outcome=Failure provenance=Verifier
-2 after persisted failure/reload: signal=fast distribution=[fast:0.9, balanced:0.08, strong:0.02] policy=balanced actual=balanced outcome=Success provenance=Verifier
-3 explicit unknown: signal=fast distribution=[fast:0.9, balanced:0.08, strong:0.02] policy=fast actual=fast outcome=Unknown provenance=None
-4 after unknown: signal=fast distribution=[fast:0.9, balanced:0.08, strong:0.02] policy=fast actual=fast outcome=Unknown provenance=None
-5 pre-output failover: signal=fast distribution=[fast:0.9, balanced:0.08, strong:0.02] policy=fast actual=balanced outcome=Success provenance=Verifier
+SIMULATED decisions and chat responses. Real routing, verification and persistence.
+[3,1,2]
+[1,2,3]
 ```
 
-The Fast fixture intentionally returns a bad answer first. An independent
-verifier catches it. On a **later request**, persisted failure evidence makes
-policy choose Balanced, even though the simulated recommendation is still Fast.
-Unknown outcomes do not change policy. A separate simulated provider outage
-demonstrates transport failover and correct attribution to the alternate route.
-The application asserts these transitions before declaring the demo successful.
+The first client's wrong answer is checked against the independently sorted input.
+Its known failure raises the next request's minimum tier. It is **not retried for
+quality inside the first request**. The example creates a fresh ignored database
+per run, so the output is reproducible.
 
-This is **not evidence that a real fast model is bad, that a strong model is
-better, or that Julia is 90% accurate**. Those probabilities are fixture data.
+Restore can download **NuGet packages**. Neither application downloads models.
+"Offline" means no network model inference, not that package installation never
+uses the internet.
 
-## The idea in one picture
+## Choose how far to go
 
-```text
-task + comparable recent outcomes
-          |
-          v
-decision signal          "Which minimum tier seems sufficient?"
-          |
-          v
-application policy       "Which routes are allowed?"
-          |
-          v
-MEAI execution           "Which client actually completed?"
-          |
-          v
-independent verification "Did the result meet this task's checks?"
-          |
-          v
-SQLite outcome evidence ---------> a later independent request
-```
-
-Fast / Balanced / Strong are stable application **capability tiers**, not
-specific models or measured guarantees. They let you express intended
-cost/latency/quality tradeoffs, then map each tier to your own concrete client.
-You still need to evaluate that mapping for your tasks.
-
-**MEAI is not ML.NET.** The routing APIs here belong to
-`Microsoft.Extensions.AI`, not ML.NET's `Microsoft.ML` training or `IDataView`
-APIs. Julia-1 is a pretrained **decision model** that scores supplied alternatives;
-it is not a chat model. Native mode uses ONNX Runtime for inference and a native
-tokenizer. No ML.NET training, fine-tuning, or Julia weight updates are involved.
-
-## Follow the learning path
-
-| Start here | What you will learn |
-|---|---|
-| [1. Concepts and glossary](docs/01-concepts.md) | Router, model, provider, client, decision, and policy without assuming ML knowledge |
-| [2. Offline walkthrough](docs/02-offline-walkthrough.md) | Read the five transitions and distinguish transport health from task quality |
-| [3. Code tour](docs/03-code-tour.md) | Follow the actual types and files from input to persisted feedback |
-| [4. Run real Julia locally](docs/04-native-julia.md) | Pinned assets, manual setup, hashes, strict token budgets, and ownership |
-| [5. Opt into live chat](docs/05-live-chat.md) | Environment-only settings, model mapping, billing, and data movement |
-| [6. Policy and lifecycle reference](docs/06-policy-and-lifecycle.md) | Confidence, evidence windows, identity, feedback, cancellation, and streaming |
-| [Troubleshooting](docs/troubleshooting.md) | Missing configuration, native libraries, token limits, and storage failures |
-
-The [learning-path index](docs/README.md) suggests routes for .NET and ML newcomers.
-
-## Choose what is real
-
-| Command after restore | Decision signal | Downstream response |
+| Application | What is real | Run / read |
 |---|---|---|
-| `dotnet run --project src\JuliaRouting.Sample` | **Fixture** | **Fixture** |
-| Add `-- --julia artifacts\decision-models\julia` | **Real Julia CPU inference** | **Fixture** |
-| Add `-- --julia artifacts\decision-models\julia --live` | **Real Julia CPU inference** | **Configured live chat service** |
+| Developer quickstart | MEAI routing, verification, persistence; decisions and chat are fixtures | [Getting started](samples/GettingStarted/README.md) |
+| The same API with Julia | Local CPU Julia decisions; chat is still simulated | [Julia routing](samples/JuliaRouting/README.md) |
+| Advanced outcome scenario | Full failure/reload/unknown/failover demonstration; optional Julia and live chat | [Advanced walkthrough](docs/02-offline-walkthrough.md) |
 
-Native assets are not included; read the [native guide](docs/04-native-julia.md)
-before using those flags. `--live` is the only network-inference path and may
-incur charges. Live endpoint compatibility has not been exercised.
+After [preparing the pinned assets](docs/04-native-julia.md), run the small native
+application with **one argument**:
 
-## Check the implementation
+```powershell
+dotnet run --project samples\JuliaRouting -- artifacts\decision-models\julia
+```
+
+The existing advanced console remains available with its original commands:
+
+```powershell
+dotnet run --project src\JuliaRouting.Sample
+dotnet run --project src\JuliaRouting.Sample -- --help
+```
+
+Its opt-in `--julia <directory> --live` mode uses explicitly configured real chat
+clients. Review [live setup, billing, and privacy](docs/05-live-chat.md) before
+using it. No live endpoint has been certified by these local demonstrations.
+
+## What you choose; what the library handles
+
+You choose the client-to-tier mapping. `OutcomeRoutingOptions` groups the history
+path, nonidentifying cohort for comparable tasks, optional request-specific verifier
+factory, capability/minimum tier, and bounded `PolicySettings` **at creation**.
+Default configuration uses `.routing\history.db`, cohort `text-v1`, and no verifier.
+No verifier means **Unknown**, not Success. Later independently known application
+feedback is [optionally accessible](docs/03-code-tour.md#optional-outcome-information)
+through typed response metadata and `GetService`, not required to call the client.
+
+The library validates the decision distribution, applies policy, executes using
+MEAI, records actual attempts, and correlates verified feedback to the completed
+route. Only bounded, relevant known outcomes with the same configuration become
+future evidence. Configuration changes isolate history; they never update Julia's
+weights.
+
+Fast / Balanced / Strong express intended cost/latency/capability tradeoffs, not
+fixed models or guarantees. Evaluate your own mapping.
+
+**MEAI is not ML.NET.** These routing APIs are in `Microsoft.Extensions.AI`, not
+ML.NET's `Microsoft.ML` training / `IDataView` APIs. Julia is a pretrained
+finite-choice decision model, **not a chat model**. It scores described alternatives
+using ONNX Runtime; no training or fine-tuning is required.
+
+## Implementation and boundaries
+
+The [application API and implementation tour](docs/03-code-tour.md) explains the
+routed `IChatClient` first, then the advanced internals. The [reference index](docs/README.md)
+links concepts, native setup, policy/lifecycle, and troubleshooting; none is a
+prerequisite to reading the quickstart.
+
+Candidate probabilities are **not calibrated task-success chances**. Transport
+completion is not verified success. The toy sort verifier is not production
+semantic evaluation. After any streaming update reaches the caller, there is
+**no mid-stream failover**; dispose streaming enumerators to preserve cleanup.
+Use synthetic tasks: SQLite omits raw task/output/credentials by default, but
+console output and real providers have separate privacy boundaries.
+
+This sample supports complete system/user/assistant **text** history and forwards
+the original messages, roles, content fragments and provider response unchanged.
+For selection, all supplied text and roles must fit a **300-character projection**;
+overflow fails before persistence or inference, with no truncation.
+This is a sample policy limit, **not an MEAI limit or a token budget**.
+Images, tools, opaque content, provider conversation IDs/continuations and background
+responses are explicitly out of scope. See [composition and streaming](docs/03-code-tour.md#standard-meai-composition-and-streaming)
+for middleware placement and the supported contract.
+
+The Julia adapter strictly rejects oversized inputs: **1024 combined tokens,
+256 head, 48 per option**, not upstream Python's newer 8k limit. Model assets are
+not bundled. Windows x64 CPU is exercised; other native platforms remain unverified.
 
 ```powershell
 dotnet build JuliaRouting.slnx --no-restore
 dotnet test tests\OutcomeRouting.Tests\OutcomeRouting.Tests.csproj --no-restore
 .\eng\Verify-Vendor.ps1
-dotnet run --project src\JuliaRouting.Sample -- --help
 ```
 
-The native-independent suite has **140 passing cases** covering policy, actual
-route attribution, concurrency, persistence, option isolation, cancellation,
-streaming commitment, and failure cleanup. The vendor check verifies all **15
-unchanged C#/project files** against the pinned source manifest. Validation used
-Windows x64 and .NET SDK 10.0.401; other native platforms are not certified.
-
-The [CI workflow](.github/workflows/ci.yml) runs this bounded suite on Windows with
-.NET 10. It restores the locks from official NuGet, audits direct and transitive
-packages against NuGet's official vulnerability data, and fails on audit warnings
-(including unavailable data). It requires no provider secrets, Julia assets, or
-live model calls.
-
-## Important boundaries
-
-Candidate probabilities are **not calibrated task-success chances**. A completed
-response is not a verified success. A poor answer ends its request; feedback can
-affect the next one, not silently trigger a same-request quality cascade.
-After any streaming update reaches the caller, there is **no mid-stream failover**.
-The toy verifier demonstrates a checkable transformation, not production semantic
-evaluation or automatic optimal routing.
-
-This is a compact teaching sample: no agent framework, coding subprocess harness,
-dashboard, route cache, exploration algorithm, distributed history, or training.
-Use synthetic tasks while learning. Local SQLite omits raw prompts, output, and
-credentials by default, but console output and a live provider have separate
-[privacy boundaries](docs/05-live-chat.md#privacy-and-cost).
+The [CI workflow](.github/workflows/ci.yml) restores locks, audits all transitive
+packages against official NuGet vulnerability data with warnings as errors,
+builds, runs the bounded tests and offline quickstart, and verifies the **15
+unchanged vendor C#/project hashes**. It uses no provider credentials or model assets.
 
 ## Attribution and release rights
 
-The outcome loop borrows concepts from [Jevia](https://github.com/assistant-ui/jevia).
-The MEAI implementation follows its
-[routing and failover primitives](https://devblogs.microsoft.com/dotnet/routing-and-failover-for-microsoft-extensions-ai/).
-Julia/abstractions/ONNX source is pinned to
-[typesafe-meai commit 2266e935](https://github.com/luisquintanilla/typesafe-meai/commit/2266e935007b83391b9ea4c506ec6703b271372b).
-See [source and dependency provenance](vendor/README.md) and the
-[hash manifest](vendor/provenance.json).
+[Jevia](https://github.com/assistant-ui/jevia) inspired the outcome loop.
+The real MEAI APIs are described in the
+[routing and failover article](https://devblogs.microsoft.com/dotnet/routing-and-failover-for-microsoft-extensions-ai/).
+The vendored decision implementation is pinned to
+[typesafe-meai commit 2266e935](https://github.com/luisquintanilla/typesafe-meai/commit/2266e935007b83391b9ea4c506ec6703b271372b);
+see [provenance](vendor/README.md) and [file hashes](vendor/provenance.json).
 
-This sample and its exact vendored C# implementation are distributed under the
-[MIT license](LICENSE), with source-owner authorization for this publication.
-The original pinned source had no root LICENSE; this is **not** a claim that the
-upstream revision was already MIT-licensed. The separate pinned Julia model cards
-declare Apache-2.0 artifacts. Model assets and dependency binaries are not bundled;
-their independent licenses are listed in [third-party notices](THIRD_PARTY_NOTICES.md).
+This sample and its exact vendored C# code have owner-authorized [MIT](LICENSE)
+distribution. The original revision had no root LICENSE; this does **not** claim
+it was already MIT-licensed. Separate Julia artifacts retain Apache-2.0 according
+to their pinned cards; dependencies have their own [notices](THIRD_PARTY_NOTICES.md).
+No official Microsoft, Julia, or Jevia endorsement is implied.

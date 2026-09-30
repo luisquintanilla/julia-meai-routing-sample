@@ -2,7 +2,7 @@
 
 [Sample home](../README.md) | [Learning path](README.md)
 
-Run commands from the repository root. The console returns **exit code 2** for an
+Run commands from the repository root. Native and advanced consoles return **exit code 2** for an
 error. Missing assets/configuration are errors, not uncertain model predictions.
 There is no silent fallback to fixtures, default success, or empty history.
 
@@ -13,9 +13,10 @@ There is no silent fallback to fixtures, default success, or empty history.
 | `dotnet` is missing, or only a runtime is installed | Install a .NET 10 **SDK**; run `dotnet --version` |
 | Project cannot be found | Change to the directory containing `JuliaRouting.slnx`, then use the documented project path |
 | Package restore fails | Check NuGet connectivity/access; use `dotnet restore JuliaRouting.slnx --locked-mode`. This is dependency acquisition, not a model download |
-| CLI rejects an option | Run `dotnet run --project src\JuliaRouting.Sample -- --help`; app flags belong after `--` |
+| CLI rejects an option | The small native application takes only a directory (or `--help`). The advanced console has flags: `dotnet run --project src\JuliaRouting.Sample -- --help`; app arguments belong after `--` |
 | `--store`, `--no-verifier`, or policy flags fail in default mode | Those flags require `--julia`; the offline demo intentionally has isolated data and fixed asserted settings |
 | Experimental MEAI diagnostic | MEAI001 is expected for routing types. Suppression is local to `OutcomeRouter.cs`; do not disable all warnings solution-wide |
+| A normal chat call exceeds 300 characters | The routed client's selection projection includes every supplied message's text and role labels. This sample explicitly rejects overflow before invocation; it is not an MEAI limit and does not drop earlier history |
 
 The local empty `Directory.Build.targets` prevents unrelated ancestor build
 targets from being imported. Do not copy another repository's build infrastructure
@@ -31,7 +32,7 @@ vulnerabilities, not every possible defect.
 
 | Symptom | Check / action |
 |---|---|
-| "Julia asset directory not found" | Pass an existing explicit directory after `--julia` |
+| "Julia asset directory not found" | Supply the directory as the small native application's one argument, or after `--julia` in the advanced console |
 | Missing `model.onnx`, `.data`, or `tokenizer.json` | Follow the [pinned native setup](04-native-julia.md#prepare-an-explicit-directory); no file is downloaded automatically |
 | SHA256 mismatch | Stop. Compare all three files to the pin; inspect failed/incomplete acquisition or a Git LFS pointer. Do not bypass the check |
 | Native library/architecture load error | Both CPU ORT and the Hugging Face tokenizer need compatible native binaries. Windows x64 is exercised; other platforms are unverified |
@@ -39,7 +40,7 @@ vulnerabilities, not every possible defect.
 | Token/head/option budget exceeded | Shorten the actual task/context/history/description thoughtfully. This adapter permits 1024 total / 256 head / 48 option tokens, not upstream Python's newer 8k setting |
 | Reserved token rejected | Avoid model framing-token literals such as `<mask>` in caller state/instructions/options; they are not ordinary prompt text |
 | Inference seems blocking | `GenerateAsync` serializes synchronous native inference; `await` does not make it nonblocking. Resident reuse avoids repeated loading but is not a latency guarantee |
-| Cancellation/load takes longer than expected | Request cancellation is cooperative; synchronous loading occurs before the console request deadline |
+| Cancellation/load takes longer than expected | Request cancellation is cooperative; synchronous loading occurs before the advanced console's request deadline |
 
 Do not silently truncate important task data or substitute a different model to
 avoid an error. A task's character limits are not a guaranteed token fit.
@@ -89,7 +90,8 @@ background responses or tool controls. A `ChatOptions.ResponseFormat` also needs
 the task's declared Json capability. These inputs fail explicitly before invocation;
 they are not forwarded in hopes that the provider will interpret them safely.
 
-Always dispose streaming enumeration. A disposed early stream is Abandoned, not
+Use the normal `IChatClient.GetStreamingResponseAsync` method, and always dispose
+streaming enumeration. A disposed early stream is Abandoned, not
 known Success, even if the partial text looks plausible. Completed empty or
 unsupported streams are explicitly Unknown. Completed supported text can be
 independently verified, subject to the accumulation bound.

@@ -1,7 +1,11 @@
-# 2. Follow one task through the offline demo
+# 2. Advanced: follow one task through the outcome loop
 
 [Learning path](README.md) | Previous: [concepts](01-concepts.md) |
 Next: [code tour](03-code-tour.md)
+
+For the small application-facing API, start with
+[GettingStarted](../samples/GettingStarted/README.md).
+This reference uses the existing full scenario to inspect its internal guarantees.
 
 From the repository root, after the [quickstart restore](../README.md#try-it-first):
 
@@ -88,7 +92,7 @@ Success belongs to **Balanced**, never to the failed Fast route.
 
 ## Inspect behavior, not just exit status
 
-[`Demonstrations.RunAsync`](../src/JuliaRouting.Sample/Program.cs) contains assertions
+[`Demonstrations.RunAsync`](../src/JuliaRouting.Sample/Demonstrations.cs) contains assertions
 for each transition, actual-attempt attribution, stored evidence, and cleanup.
 Each demo run creates a unique `.routing\demo-<unique>\history.db`; reruns cannot
 inherit the previous demo's failures. Default demonstrations do not mix data into

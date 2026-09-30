@@ -26,3 +26,5 @@ jobs:
         run: dotnet test tests\OutcomeRouting.Tests\OutcomeRouting.Tests.csproj --no-build --no-restore --configuration Release
       - name: Verify vendored source
         run: .\eng\Verify-Vendor.ps1
+      - name: Run developer quickstart (offline)
+        run: dotnet run --project samples\GettingStarted --no-build --no-restore --configuration Release

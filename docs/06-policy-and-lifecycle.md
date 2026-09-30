@@ -99,6 +99,11 @@ or sensitive metadata.
 
 ## Feedback and storage
 
+The application-facing [IChatClient](../src/OutcomeRouting/OutcomeRoutingChatClient.cs)
+constructs the core wiring described here. It borrows caller-supplied generators
+and clients, including shared clients, and never disposes them. Dispose the routed client
+first, after stopping operations, then dispose dependencies at their owning scope.
+
 [`Feedback`](../src/OutcomeRouting/Contracts.cs) has a task outcome, provenance,
 and a short source key. These combinations are valid:
 
@@ -124,10 +129,22 @@ refer to a local completed run whose verifier was omitted:
 ```csharp
 RunRecord run = store.GetRun(runId);
 if (run.Status != RunStatus.Completed || run.ActualRouteIdentity is null)
+{
     throw new InvalidOperationException("Independent feedback requires a completed actual route.");
-store.ReportFeedback(run.RunId, run.ActualRouteIdentity,
-    new Feedback(Outcome.Failure, Provenance.Application, "application-check-v1"));
+}
+
+store.ReportFeedback(
+    run.RunId,
+    run.ActualRouteIdentity,
+    new Feedback(
+        Outcome.Failure,
+        Provenance.Application,
+        "application-check-v1"));
 ```
+
+The optional `OutcomeRoutingChatClient.ReportFeedback(runId, feedback)` method finds the same
+completed actual route internally. Only use either API after an independent check;
+it is not a way to mark transport completion successful.
 
 Do not report Failure merely because a request timed out: that is transport
 telemetry, not a completed task-quality result. Do not invent Success because a

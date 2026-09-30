@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OutcomeRouting\OutcomeRouting.csproj" />
+    <Compile Include="..\Shared\DemoChatClient.cs" Link="DemoChatClient.cs" />
+    <Compile Include="..\Shared\SortVerification.cs" Link="SortVerification.cs" />
+  </ItemGroup>
+</Project>

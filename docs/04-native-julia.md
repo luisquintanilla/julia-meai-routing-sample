@@ -33,6 +33,16 @@ require compatible ORT and tokenizer binaries and are unverified here.
 
 ## Prepare an explicit directory
 
+The small [Julia application](../samples/JuliaRouting/Program.cs) accepts only the
+asset directory. After the setup below:
+
+```powershell
+dotnet run --project samples\JuliaRouting -- artifacts\decision-models\julia
+```
+
+The original advanced `--julia` command additionally prints packing diagnostics.
+Both use the same hash-checked local generator; neither downloads assets.
+
 ```text
 artifacts\decision-models\julia\
   model.onnx
@@ -140,16 +150,19 @@ Padding aligns tensor shape; it does not add semantic task evidence.
 ## Lifetime and asynchronous caveats
 
 [`JuliaDecisionGenerator.LoadFromDirectory`](../vendor/src/DecisionInference.Julia/JuliaDecisionGenerator.cs)
-loads an **owning** generator. `Program.cs` holds one instance for the run, then
-disposes its ORT scorer/session and native tokenizer. A service should likewise
+loads an **owning** generator. The small application's `Program.cs` holds one
+instance for the run, then disposes its ORT scorer/session and native tokenizer.
+The advanced console keeps that lifetime in
+[`NativeScenario.cs`](../src/JuliaRouting.Sample/NativeScenario.cs). A service should likewise
 load once, reuse it, and dispose on shutdown. Do not dispose borrowed/in-flight
 resources or mutate assets while inference is running.
 
 Preparation and inference are serialized. Returning `Task<DecisionResult>` does
 not make synchronous native work nonblocking. Cancellation requests ORT
 termination cooperatively; it is not a hard real-time guarantee.
-The console's 60-second request deadline starts **after synchronous model loading**.
-Its two-thread setting is illustrative, not a performance recommendation.
+The advanced console's 60-second request deadline starts **after synchronous model
+loading**. Its two-thread setting is illustrative, not a performance recommendation.
+The small application uses provider defaults; neither path is a benchmark.
 
 No weights are changed, and there is no automatic fine-tuning, training-data
 collection or ML.NET training pipeline.

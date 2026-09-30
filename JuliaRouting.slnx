@@ -7,4 +7,8 @@
   <Project Path="src/OutcomeRouting/OutcomeRouting.csproj" />
   <Project Path="src/JuliaRouting.Sample/JuliaRouting.Sample.csproj" />
   <Project Path="tests/OutcomeRouting.Tests/OutcomeRouting.Tests.csproj" />
+  <Folder Name="/samples/">
+    <Project Path="samples/GettingStarted/GettingStarted.csproj" />
+    <Project Path="samples/JuliaRouting/JuliaRouting.csproj" />
+  </Folder>
 </Solution>

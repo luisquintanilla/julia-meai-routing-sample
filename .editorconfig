@@ -1,0 +1,13 @@
+root = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+csharp_prefer_braces = true:warning
+csharp_style_allow_embedded_statements_on_same_line_experimental = false
+csharp_style_allow_blank_lines_between_consecutive_braces_experimental = false
+dotnet_diagnostic.IDE0011.severity = warning
+
+[vendor/src/**]
+csharp_prefer_braces = false:none
+dotnet_diagnostic.IDE0011.severity = none
